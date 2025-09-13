@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-// Interface to interact with the DisputeResolutionDAO
 interface IDisputeResolutionDAO {
     function createDispute(bytes32 questionId) external;
 }
 
 /**
  * @title DelphiOptimisticOracleV2
- * @author Project Delphi Team
+ * @author Priyanshu
  * @notice Manages dispute resolution by escalating to a DAO arbiter.
  */
 contract DelphiOptimisticOracle {
@@ -42,7 +41,6 @@ contract DelphiOptimisticOracle {
 
     mapping(bytes32 => Resolution) public resolutions;
 
-    // The arbiter is now mutable to allow for a DAO to be set post-deployment.
     address public arbiter;
     bool private arbiterIsSet;
 
@@ -141,7 +139,6 @@ contract DelphiOptimisticOracle {
         res.disputer = msg.sender;
         res.disputeBond = msg.value;
 
-        // Escalate to the DAO to start the voting process.
         IDisputeResolutionDAO(arbiter).createDispute(questionId);
 
         emit QuestionDisputed(questionId, msg.sender, msg.value);
@@ -177,10 +174,8 @@ contract DelphiOptimisticOracle {
         res.finalOutcome = finalOutcome;
         res.resolutionTimestamp = block.timestamp;
 
-        // --- NEW: Handle special outcomes first ---
 
         if (finalOutcome == OUTCOME_SPLIT) {
-            // In a 50/50 split, both parties get their original bonds back.
             (bool successProposer, ) = payable(res.proposer).call{value: res.proposalBond}("");
             require(successProposer, "Proposer refund failed");
 
@@ -188,14 +183,11 @@ contract DelphiOptimisticOracle {
             require(successDisputer, "Disputer refund failed");
 
         } else if (finalOutcome == OUTCOME_EARLY_REQUEST) {
-            // If the question is resolved as invalid, the disputer is always the winner
-            // for correctly challenging a flawed market.
             uint256 totalPot = res.proposalBond + res.disputeBond;
             (bool success, ) = payable(res.disputer).call{value: totalPot}("");
             require(success, "Winner payment failed for early request");
 
         } else {
-            // --- Standard YES/NO outcome logic ---
             address winner;
             if (finalOutcome == res.proposedOutcome) {
                 winner = res.proposer;

@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// Interface for the DelphiToken (TRC20) to allow staking and unstaking.
 interface IDelphiToken {
     function transfer(address recipient, uint256 amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
 }
 
-// Interface for the Optimistic Oracle to allow the DAO to resolve disputes.
 interface IDelphiOptimisticOracle {
     function resolveDispute(bytes32 questionId, int256 finalOutcome) external;
-    // We also need access to the outcome constants for validation
     function OUTCOME_NO() external view returns (int256);
     function OUTCOME_YES() external view returns (int256);
     function OUTCOME_SPLIT() external view returns (int256);
@@ -20,7 +17,7 @@ interface IDelphiOptimisticOracle {
 
 /**
  * @title DisputeResolutionDAO
- * @author Project Delphi Team
+ * @author Priyanshu
  * @notice A DAO that allows DELPHIToken holders to stake their tokens and vote to
  * resolve disputes escalated from the DelphiOptimisticOracle.
  */
@@ -33,23 +30,15 @@ contract DisputeResolutionDAO {
     IDelphiToken public immutable delphiToken;
     IDelphiOptimisticOracle public immutable oracle;
 
-    // uint256 public constant VOTING_PERIOD_SECONDS = 72 hours; // 3-day voting period
     uint256 public constant VOTING_PERIOD_SECONDS = 20 seconds; // 20 seconds for testing
-
-    // Tracks the amount of DELPHIToken staked by each user.
     mapping(address => uint256) public stakedBalances;
-
-    // A struct to manage the state of each dispute's vote.
     struct DisputeVote {
         bool exists;
         uint256 votingDeadline;
-        // Mapping from an outcome (e.g., 0 for NO, 1 for YES) to the total stake voted for it.
         mapping(int256 => uint256) votesPerOutcome;
-        // Mapping to ensure each user can only vote once per dispute.
         mapping(address => bool) hasVoted;
     }
 
-    // Maps a questionId from the oracle to its corresponding vote in the DAO.
     mapping(bytes32 => DisputeVote) public disputes;
 
     // ==================================================================
@@ -157,7 +146,6 @@ contract DisputeResolutionDAO {
         if (stakedBalances[msg.sender] == 0) revert NoStake();
         if (disputeVote.hasVoted[msg.sender]) revert AlreadyVoted();
 
-        // Validate that the vote is for a legitimate outcome
         if (
             outcome != oracle.OUTCOME_NO() &&
             outcome != oracle.OUTCOME_YES() &&
@@ -183,7 +171,6 @@ contract DisputeResolutionDAO {
         if (!disputeVote.exists) revert DisputeNotActive();
         if (block.timestamp <= disputeVote.votingDeadline) revert VotingPeriodNotOver();
 
-        // Find the winning outcome by iterating through the standard outcomes.
         int256 winningOutcome = oracle.OUTCOME_NO();
         uint256 maxVotes = disputeVote.votesPerOutcome[winningOutcome];
 
@@ -201,14 +188,8 @@ contract DisputeResolutionDAO {
             }
         }
         
-        // In case of a perfect tie, the default resolution is NO.
-
-        // Make the callback to the Oracle to finalize the dispute.
         oracle.resolveDispute(questionId, winningOutcome);
-
-        // Clean up to prevent re-resolution and save gas for future interactions.
         delete disputes[questionId];
-
         emit DisputeResolved(questionId, winningOutcome, maxVotes);
     }
 }
