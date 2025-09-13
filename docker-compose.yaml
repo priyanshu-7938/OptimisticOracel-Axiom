@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  tron-node:
+    image: tronprotocol/java-tron:latest
+    container_name: tron-dev-node
+    ports:
+      - "9090:9090" # Full Node API
+      - "8091:8091" # Event Server
+    environment:
+      # Use the standard developer private key for the genesis node
+      - PRIVATE_KEY=${TRON_DEV_PRIVATE_KEY}
+    command: >
+      /bin/sh -c
+      "java -jar /usr/src/app/java-tron.jar
+      --witness
+      --dev
+      -p $$PRIVATE_KEY
+      --enable-api 'database,net,trx,wallet,event'"
